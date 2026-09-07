@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-<title>规划师工作台 · 个人办公</title>
+<title>何老师工作台 · 个人办公</title>
 <style>
 /* ==================== Reset & Base ==================== */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -552,6 +552,31 @@ textarea.input{resize:vertical;line-height:1.5}
 .subtask-item .todo-check svg{width:11px;height:11px}
 .subtask-item .badge{font-size:9px;padding:1px 5px}
 
+
+/* ===== v6.3 overview monthly ===== */
+.ovm-group-label{font-size:12px;color:var(--text-3);margin:12px 0 8px;font-weight:600}
+.ovm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.ovm-card{background:var(--card);border:1px solid var(--border-l);border-radius:var(--radius);padding:12px 14px;cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.ovm-card:hover{box-shadow:var(--shadow-lg);border-color:var(--border)}
+.ovm-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.ovm-title{font-size:13.5px;font-weight:600;line-height:1.45}
+.ovm-pct{font-family:var(--serif);font-size:20px;color:var(--red);flex-shrink:0;line-height:1}
+.ovm-meta{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.ovm-bar{height:4px;background:var(--border-l);border-radius:2px;margin-top:9px;overflow:hidden}
+.ovm-bar>div{height:100%;background:var(--green);border-radius:2px;transition:width .3s}
+.ovm-detail{display:none;margin-top:10px;border-top:1px dashed var(--border-l);padding-top:8px}
+.ovm-card.open .ovm-detail{display:block}
+.ovm-sec{font-size:11px;font-weight:600;color:var(--text-3);margin:8px 0 3px}
+.ovm-remark{font-size:12.5px;color:var(--text-2);line-height:1.6}
+.ovm-none{font-size:12px;color:var(--text-3)}
+.ovm-row{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;padding:2.5px 0;color:var(--text-2)}
+.ovm-row.done{color:var(--text-3);text-decoration:line-through}
+.ovm-dot{width:15px;height:15px;border-radius:50%;border:1.2px solid var(--ink-3);flex-shrink:0;font-size:10px;line-height:14px;text-align:center;color:#fff;margin-top:1px}
+.ovm-row.done .ovm-dot{background:var(--green);border-color:var(--green)}
+.ovm-row-title{flex:1;min-width:0;line-height:1.5}
+.ovm-row-date{font-size:11px;color:var(--text-3);flex-shrink:0}
+@media(max-width:768px){.ovm-grid{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
@@ -561,7 +586,7 @@ textarea.input{resize:vertical;line-height:1.5}
   <div class="header-bar">
     <div class="logo-area">
       <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
-      <h1>规划师工作台</h1>
+      <h1>何老师工作台</h1>
       <span class="subtitle">清华同衡 · 个人办公</span>
     </div>
     <div class="header-actions">
@@ -650,13 +675,13 @@ textarea.input{resize:vertical;line-height:1.5}
       <div class="ov-stats stats-grid" id="ovStats">
         <div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div>
       </div>
+      <div class="ov-section-title">月度任务</div>
+      <div id="ovMonthly">
+        <div class="sk-row"></div><div class="sk-row"></div>
+      </div>
       <div class="ov-section-title">今日聚焦</div>
       <div class="today-zone" id="ovToday">
         <div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div>
-      </div>
-      <div class="ov-section-title">本周节奏</div>
-      <div class="chart-card week-chart" id="ovWeekChart">
-        <div class="sk-row"></div><div class="sk-row"></div>
       </div>
     </div>
 
@@ -9080,6 +9105,57 @@ function goalProgress(g){
 }
 function dateStrOf(ms){var d=new Date(ms);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 
+function monthlyProgress(m){
+  var subs=m.subtasks||[];
+  if(subs.length>0){return Math.round(subs.filter(function(s){return s.done}).length/subs.length*100);}
+  var linked=state.todos.filter(function(t){return t.monthlyTodoId===m.id});
+  if(linked.length>0){return Math.round(linked.filter(function(t){return t.done}).length/linked.length*100);}
+  return 0;
+}
+function renderOvMonthly(){
+  var el=document.getElementById('ovMonthly');
+  var act=state.monthlyTodos.filter(function(m){return!m.done}).sort(function(a,b){return(a.deadline||'9999')<(b.deadline||'9999')?-1:1});
+  if(act.length===0){el.innerHTML='<div class="tz-empty">本月没有进行中的月度任务。</div>';return;}
+  function card(m){
+    var proj=m.projectId?state.projects.find(function(p){return p.id===m.projectId}):null;
+    var pct=monthlyProgress(m);
+    var subs=(m.subtasks||[]).slice().sort(function(a,b){return(a.deadline||'')<(b.deadline||'')?-1:1});
+    var subsDone=subs.filter(function(s){return s.done}).length;
+    var today=todayStr();
+    var todayTodos=state.todos.filter(function(x){return x.monthlyTodoId===m.id&&x.deadline===today});
+    var h='';
+    h+='<div class="ovm-card" data-action="ovm-toggle">';
+    h+='<div class="ovm-top"><div class="ovm-title">'+escapeHtml(m.title)+'</div><div class="ovm-pct">'+pct+'%</div></div>';
+    h+='<div class="ovm-meta">';
+    h+='<span class="badge '+m.priority+'">'+m.priority+'</span>';
+    if(m.deadline)h+='<span class="badge deadline">'+fmtDate(m.deadline)+'</span>';
+    if(proj)h+='<span class="badge project">'+escapeHtml(proj.name)+'</span>';
+    if(subs.length>0)h+='<span class="badge monthly">子任务 '+subsDone+'/'+subs.length+'</span>';
+    h+='</div>';
+    h+='<div class="ovm-bar"><div style="width:'+Math.max(pct,pct>0?4:0)+'%"></div></div>';
+    h+='<div class="ovm-detail">';
+    h+='<div class="ovm-sec">任务描述</div>';
+    h+='<div class="ovm-remark">'+escapeHtml(m.remark||'（无备注）')+'</div>';
+    h+='<div class="ovm-sec">子任务（'+subs.length+'）</div>';
+    if(subs.length===0)h+='<div class="ovm-none">暂无子任务</div>';
+    subs.forEach(function(s){
+      h+='<div class="ovm-row'+(s.done?' done':'')+'"><span class="ovm-dot">'+(s.done?'✓':'')+'</span><span class="ovm-row-title">'+escapeHtml(s.title)+'</span>'+(s.deadline?'<span class="ovm-row-date">'+fmtDateShort(s.deadline)+'</span>':'')+'</div>';
+    });
+    h+='<div class="ovm-sec">今天待办（'+todayTodos.length+'）</div>';
+    if(todayTodos.length===0)h+='<div class="ovm-none">今天没有关联待办</div>';
+    todayTodos.forEach(function(x){
+      h+='<div class="ovm-row'+(x.done?' done':'')+'"><span class="ovm-dot">'+(x.done?'✓':'')+'</span><span class="ovm-row-title">'+escapeHtml(x.title)+'</span></div>';
+    });
+    h+='</div></div>';
+    return h;
+  }
+  var withProj=act.filter(function(m){return m.projectId});
+  var noProj=act.filter(function(m){return!m.projectId});
+  var html='';
+  if(withProj.length>0)html+='<div class="ovm-group-label">有项目 · '+withProj.length+'</div><div class="ovm-grid">'+withProj.map(card).join('')+'</div>';
+  if(noProj.length>0)html+='<div class="ovm-group-label">无项目 · '+noProj.length+'</div><div class="ovm-grid">'+noProj.map(card).join('')+'</div>';
+  el.innerHTML=html;
+}
 function renderOverview(){
   /* greeting */
   var h=new Date().getHours();
@@ -9101,6 +9177,7 @@ function renderOverview(){
     '<div class="stat-card"><div class="stat-value">'+doneThisWeek+'</div><div class="stat-label">近7天完成</div></div>'+
     '<div class="stat-card"><div class="stat-value">'+monthlyActive+'</div><div class="stat-label">月度任务进行中</div></div>'+
     '<div class="stat-card"><div class="stat-value">'+projActive+'</div><div class="stat-label">进行中项目</div></div>';
+  renderOvMonthly();
 
   /* today zone */
   var tz=state.todos.filter(function(t){return!t.done&&t.deadline&&t.deadline<=today})
@@ -9132,23 +9209,6 @@ function renderOverview(){
   }
   document.getElementById('ovToday').innerHTML=tzHtml;
 
-  /* week chart */
-  var days=[],maxDone=1;
-  for(var i=6;i>=0;i--){
-    var ds=dateOffset(-i);
-    var done=state.todos.filter(function(t){return t.done&&t.doneAt&&dateStrOf(t.doneAt)===ds}).length;
-    if(done>maxDone)maxDone=done;
-    days.push({ds:ds,done:done});
-  }
-  var wcHtml='<div class="chart-row" style="margin-bottom:6px"><span class="bar-label" style="font-weight:600">近7天完成待办</span><span class="bar-value">'+days.reduce(function(a,b){return a+b.done},0)+' 项</span></div>';
-  var wdNames=['日','一','二','三','四','五','六'];
-  days.forEach(function(d){
-    var dObj=new Date(d.ds+'T00:00:00');
-    var label='周'+wdNames[dObj.getDay()]+' '+fmtDateShort(d.ds);
-    var w=Math.round(d.done/maxDone*100);
-    wcHtml+='<div class="chart-row"><span class="wc-label">'+label+'</span><div class="wc-bar"><div style="width:'+Math.max(w,d.done>0?6:0)+'%"></div></div><span class="wc-val">'+d.done+'</span></div>';
-  });
-  document.getElementById('ovWeekChart').innerHTML=wcHtml;
 }
 
 /* ==================== refreshAll (single render entry) ==================== */
@@ -9358,6 +9418,7 @@ function bindEvents(){
       case'cancel-edit-project':toggleProjectEdit(id);break;
       case'goto-projects':switchTab('projects');break;
       case'goto-today':switchTab('today');break;
+      case'ovm-toggle':var oc=btn.closest('.ovm-card');if(oc)oc.classList.toggle('open');break;
       case'quick-add-todo':quickAddTodo(btn.dataset.mtid,btn.dataset.subid);break;
       case'add-goal':addGoal();break;
       case'edit-goal':toggleGoalEdit(id);break;
