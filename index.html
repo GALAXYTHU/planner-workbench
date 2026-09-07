@@ -197,7 +197,7 @@ textarea.input{resize:vertical;line-height:1.5}
 .todo-group{margin-bottom:18px}
 .todo-group-header{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-2);letter-spacing:.5px;margin-bottom:8px;padding:0 2px}
 .todo-group-header .gh-count{font-weight:400;color:var(--text-3)}
-.todo-item{background:var(--card);border:1px solid var(--border-l);border-radius:var(--radius);margin-bottom:8px;box-shadow:var(--shadow);transition:box-shadow .15s}
+.todo-item{display:flex;flex-wrap:wrap;align-items:flex-start;column-gap:10px;background:var(--card);border:1px solid var(--border-l);border-radius:var(--radius);margin-bottom:8px;padding:11px 14px;box-shadow:var(--shadow);transition:box-shadow .15s}
 .todo-item:hover{box-shadow:var(--shadow-lg)}
 .todo-item.done{opacity:.55}
 .todo-item.pending-op{border-style:dashed}
@@ -227,7 +227,7 @@ textarea.input{resize:vertical;line-height:1.5}
 
 /* ==================== Monthly / Subtasks ==================== */
 .subtasks{margin:4px 0 0 32px;border-left:2px solid var(--border-l);padding-left:12px;padding-bottom:6px}
-.subtask-item{padding:7px 0;border-bottom:1px dashed var(--border-l)}
+.subtask-item{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--border-l)}
 .subtask-item:last-of-type{border-bottom:none}
 .subtask-add{display:flex;gap:6px;padding:8px 0;flex-wrap:wrap;align-items:center}
 .subtask-add .input,.subtask-add .select{font-size:12px;padding:6px 9px;width:auto}
@@ -544,6 +544,14 @@ textarea.input{resize:vertical;line-height:1.5}
 .note-card.editing .note-edit-form{display:block}
 .note-card.editing .note-content,.note-card.editing .note-footer{display:none}
 
+
+/* ===== v6.2 layout fixes ===== */
+.todo-item>.todo-edit-form{width:100%}
+.todo-item.editing>.todo-check,.todo-item.editing>.todo-body,.todo-item.editing>.todo-actions{display:none}
+.subtask-item .todo-check{width:16px;height:16px;margin-top:1px;flex-shrink:0}
+.subtask-item .todo-check svg{width:11px;height:11px}
+.subtask-item .badge{font-size:9px;padding:1px 5px}
+
 </style>
 </head>
 <body>
@@ -645,10 +653,6 @@ textarea.input{resize:vertical;line-height:1.5}
       <div class="ov-section-title">今日聚焦</div>
       <div class="today-zone" id="ovToday">
         <div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div>
-      </div>
-      <div class="ov-section-title">目标进度</div>
-      <div class="goals-grid" id="ovGoals">
-        <div class="sk-row"></div><div class="sk-row"></div>
       </div>
       <div class="ov-section-title">本周节奏</div>
       <div class="chart-card week-chart" id="ovWeekChart">
@@ -9127,25 +9131,6 @@ function renderOverview(){
     tzHtml+='</div>';
   }
   document.getElementById('ovToday').innerHTML=tzHtml;
-
-  /* goals */
-  var gHtml='';
-  state.goals.forEach(function(g){
-    var cur=goalProgress(g);
-    var pct=Math.min(1,g.target>0?cur/g.target:0);
-    var c=2*Math.PI*34;
-    gHtml+='<div class="goal-card" data-goal-id="'+g.id+'">';
-    gHtml+='<div class="goal-ring"><svg viewBox="0 0 80 80"><circle class="ring-bg" cx="40" cy="40" r="34"/><circle class="ring-fg" cx="40" cy="40" r="34" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+(c*(1-pct)).toFixed(1)+'"/><text x="40" y="45" text-anchor="middle">'+Math.round(pct*100)+'%</text></svg></div>';
-    gHtml+='<div class="goal-name">'+escapeHtml(g.title)+'</div>';
-    gHtml+='<div class="goal-num">'+cur+' / '+g.target+' · '+escapeHtml(GOAL_METRICS[g.metric]||g.metric)+'</div>';
-    gHtml+='<div class="goal-actions"><button class="btn btn-sm btn-ghost" data-action="edit-goal" data-id="'+g.id+'">编辑</button><button class="btn btn-sm btn-ghost" data-action="delete-goal" data-id="'+g.id+'">删除</button></div>';
-    gHtml+='<div class="todo-edit-form goal-edit"><input type="text" class="te-input ge-title" value="'+escapeHtml(g.title)+'"><select class="te-select ge-metric">'+
-      ['todos_done','monthly_done','projects_done'].map(function(m){return '<option value="'+m+'"'+(g.metric===m?' selected':'')+'>'+GOAL_METRICS[m]+'</option>'}).join('')+
-      '</select><input type="number" class="te-input ge-target" min="1" value="'+g.target+'"><div class="te-btns"><button class="btn btn-sm btn-primary" data-action="save-goal" data-id="'+g.id+'">保存</button><button class="btn btn-sm btn-outline" data-action="cancel-goal" data-id="'+g.id+'">取消</button></div></div>';
-    gHtml+='</div>';
-  });
-  gHtml+='<div class="goal-card goal-add"><input type="text" class="input" id="goalTitle" placeholder="新目标，如：本月完成20项待办"><div class="form-row" style="margin-top:8px;display:flex;gap:8px"><select class="select" id="goalMetric" style="flex:1"><option value="todos_done">完成待办</option><option value="monthly_done">完成月度任务</option><option value="projects_done">完成项目</option></select><input type="number" class="input" id="goalTarget" min="1" value="10" style="width:72px" title="目标数量"></div><button class="btn btn-outline btn-block" style="margin-top:8px" data-action="add-goal">＋ 添加目标</button></div>';
-  document.getElementById('ovGoals').innerHTML=gHtml;
 
   /* week chart */
   var days=[],maxDone=1;
