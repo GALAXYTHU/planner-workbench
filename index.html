@@ -911,6 +911,7 @@ textarea.input{resize:vertical;line-height:1.5}
     <p id="modalMessage"></p>
     <div class="modal-actions">
       <button class="btn btn-outline" id="modalCancel">取消</button>
+      <button class="btn btn-outline" id="modalAlt" style="display:none">仅完成任务</button>
       <button class="btn btn-red" id="modalConfirm">确定</button>
     </div>
   </div>
@@ -8674,16 +8675,45 @@ renderCalendar();
 
 /* ==================== Render All ==================== */
 
+var modalAltCallback=null;
+function resetModalButtons(){
+var ok=document.getElementById('modalConfirm');
+ok.textContent='确定';
+ok.className='btn btn-red';
+document.getElementById('modalAlt').style.display='none';
+}
 function showConfirm(title,msg,cb){
+resetModalButtons();
 document.getElementById('modalTitle').textContent=title;
 document.getElementById('modalMessage').textContent=msg;
 document.getElementById('modalOverlay').style.display='flex';
 modalCallback=cb;
 }
 
+function showCascadeConfirm(title,msg,cascadeLabel,onCascade,onSelfOnly){
+resetModalButtons();
+document.getElementById('modalTitle').textContent=title;
+document.getElementById('modalMessage').textContent=msg;
+var ok=document.getElementById('modalConfirm');
+ok.textContent=cascadeLabel;
+ok.className='btn btn-primary';
+document.getElementById('modalAlt').style.display='';
+modalCallback=onCascade;
+modalAltCallback=onSelfOnly;
+document.getElementById('modalOverlay').style.display='flex';
+}
+
+function countLinkedUndone(pred){
+var n=0;
+state.todos.forEach(function(td){if(!td.done&&pred(td))n++;});
+return n;
+}
+
 function closeModal(){
 document.getElementById('modalOverlay').style.display='none';
 modalCallback=null;
+modalAltCallback=null;
+resetModalButtons();
 }
 
 /* ==================== Event Binding ==================== */
@@ -8799,6 +8829,20 @@ function addMonthlyTodo(){
 function toggleMonthlyTodo(id){
   var t=state.monthlyTodos.find(function(x){return x.id===id});
   if(!t)return;
+  if(!t.done){
+    var n=countLinkedUndone(function(td){return td.monthlyTodoId===id;});
+    if(n>0){
+      showCascadeConfirm('完成月度任务','「'+t.title+'」还有 '+n+' 条关联待办未完成；子任务将同步全部完成。','同时完成 '+n+' 条待办',
+        function(){applyMonthlyToggle(id,true);},
+        function(){applyMonthlyToggle(id,false);});
+      return;
+    }
+  }
+  applyMonthlyToggle(id,true);
+}
+function applyMonthlyToggle(id,cascade){
+  var t=state.monthlyTodos.find(function(x){return x.id===id});
+  if(!t)return;
   t.done=!t.done;
   t.doneAt=t.done?Date.now():null;
   var nowIso=new Date().toISOString();
@@ -8806,10 +8850,12 @@ function toggleMonthlyTodo(id){
   dbExec({op:'update',table:'mt_monthly',filter:'id=eq.'+id,patch:{done:t.done,done_at:isoOrNull(t.doneAt),updated_at:nowIso}});
   if(t.done){
     dbExec({op:'update',table:'mt_subtasks',filter:'monthly_id=eq.'+id,patch:{done:true,done_at:nowIso,updated_at:nowIso}});
-    var n=0;
-    state.todos.forEach(function(td){if(td.monthlyTodoId===id&&!td.done){td.done=true;td.doneAt=Date.now();n++;}});
-    dbExec({op:'update',table:'mt_todos',filter:'monthly_todo_id=eq.'+id+'&done=eq.false',patch:{done:true,done_at:nowIso,updated_at:nowIso}});
-    if(n>0)showToast('月度任务已完成，'+n+'条关联待办同步完成');
+    if(cascade){
+      var n=0;
+      state.todos.forEach(function(td){if(td.monthlyTodoId===id&&!td.done){td.done=true;td.doneAt=Date.now();n++;}});
+      dbExec({op:'update',table:'mt_todos',filter:'monthly_todo_id=eq.'+id+'&done=eq.false',patch:{done:true,done_at:nowIso,updated_at:nowIso}});
+      if(n>0)showToast('月度任务已完成，'+n+'条关联待办同步完成');
+    }
   }
   refreshAll();
 }
@@ -8910,11 +8956,27 @@ function toggleSubtask(parentId,subId){
   if(!mt||!mt.subtasks)return;
   var st=mt.subtasks.find(function(s){return s.id===subId});
   if(!st)return;
+  if(!st.done){
+    var n=countLinkedUndone(function(td){return td.subtaskId===subId;});
+    if(n>0){
+      showCascadeConfirm('完成子任务','「'+st.title+'」还有 '+n+' 条关联待办未完成。','同时完成 '+n+' 条待办',
+        function(){applySubtaskToggle(parentId,subId,true);},
+        function(){applySubtaskToggle(parentId,subId,false);});
+      return;
+    }
+  }
+  applySubtaskToggle(parentId,subId,true);
+}
+function applySubtaskToggle(parentId,subId,cascade){
+  var mt=state.monthlyTodos.find(function(x){return x.id===parentId});
+  if(!mt||!mt.subtasks)return;
+  var st=mt.subtasks.find(function(s){return s.id===subId});
+  if(!st)return;
   st.done=!st.done;
   st.doneAt=st.done?Date.now():null;
   var nowIso=new Date().toISOString();
   dbExec({op:'update',table:'mt_subtasks',filter:'id=eq.'+subId,patch:{done:st.done,done_at:isoOrNull(st.doneAt),updated_at:nowIso}});
-  if(st.done){
+  if(st.done&&cascade){
     var n=0;
     state.todos.forEach(function(td){if(td.subtaskId===subId&&!td.done){td.done=true;td.doneAt=Date.now();n++;}});
     dbExec({op:'update',table:'mt_todos',filter:'subtask_id=eq.'+subId+'&done=eq.false',patch:{done:true,done_at:nowIso,updated_at:nowIso}});
@@ -9376,6 +9438,7 @@ function bindEvents(){
   document.getElementById('errorRetry').addEventListener('click',function(){if(errorRetryFn)errorRetryFn();});
   document.getElementById('modalCancel').addEventListener('click',closeModal);
   document.getElementById('modalConfirm').addEventListener('click',function(){if(modalCallback)modalCallback();closeModal();});
+  document.getElementById('modalAlt').addEventListener('click',function(){if(modalAltCallback)modalAltCallback();closeModal();});
   document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
   document.getElementById('tagFilter').addEventListener('click',function(e){
     var chip=e.target.closest('.tag-chip');
