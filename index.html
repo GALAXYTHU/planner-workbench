@@ -8801,10 +8801,15 @@ function toggleMonthlyTodo(id){
   if(!t)return;
   t.done=!t.done;
   t.doneAt=t.done?Date.now():null;
+  var nowIso=new Date().toISOString();
   if(t.done&&t.subtasks){t.subtasks.forEach(function(s){s.done=true;s.doneAt=Date.now();});}
-  dbExec({op:'update',table:'mt_monthly',filter:'id=eq.'+id,patch:{done:t.done,done_at:isoOrNull(t.doneAt),updated_at:new Date().toISOString()}});
+  dbExec({op:'update',table:'mt_monthly',filter:'id=eq.'+id,patch:{done:t.done,done_at:isoOrNull(t.doneAt),updated_at:nowIso}});
   if(t.done){
-    dbExec({op:'update',table:'mt_subtasks',filter:'monthly_id=eq.'+id,patch:{done:true,done_at:new Date().toISOString(),updated_at:new Date().toISOString()}});
+    dbExec({op:'update',table:'mt_subtasks',filter:'monthly_id=eq.'+id,patch:{done:true,done_at:nowIso,updated_at:nowIso}});
+    var n=0;
+    state.todos.forEach(function(td){if(td.monthlyTodoId===id&&!td.done){td.done=true;td.doneAt=Date.now();n++;}});
+    dbExec({op:'update',table:'mt_todos',filter:'monthly_todo_id=eq.'+id+'&done=eq.false',patch:{done:true,done_at:nowIso,updated_at:nowIso}});
+    if(n>0)showToast('月度任务已完成，'+n+'条关联待办同步完成');
   }
   refreshAll();
 }
@@ -8907,7 +8912,14 @@ function toggleSubtask(parentId,subId){
   if(!st)return;
   st.done=!st.done;
   st.doneAt=st.done?Date.now():null;
-  dbExec({op:'update',table:'mt_subtasks',filter:'id=eq.'+subId,patch:{done:st.done,done_at:isoOrNull(st.doneAt),updated_at:new Date().toISOString()}});
+  var nowIso=new Date().toISOString();
+  dbExec({op:'update',table:'mt_subtasks',filter:'id=eq.'+subId,patch:{done:st.done,done_at:isoOrNull(st.doneAt),updated_at:nowIso}});
+  if(st.done){
+    var n=0;
+    state.todos.forEach(function(td){if(td.subtaskId===subId&&!td.done){td.done=true;td.doneAt=Date.now();n++;}});
+    dbExec({op:'update',table:'mt_todos',filter:'subtask_id=eq.'+subId+'&done=eq.false',patch:{done:true,done_at:nowIso,updated_at:nowIso}});
+    if(n>0)showToast('子任务已完成，'+n+'条关联待办同步完成');
+  }
   refreshAll();
 }
 function deleteSubtask(parentId,subId){
